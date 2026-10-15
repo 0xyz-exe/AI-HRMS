@@ -1,0 +1,9 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^Test-Path \\.git; if \\(Test-Path \\.git\\) \\{ git status --short --branch \\} else \\{ Write-Output 'Not a Git repository' \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    },
+    "chat.tools.terminal.ignoreDefaultAutoApproveRules": true
+}

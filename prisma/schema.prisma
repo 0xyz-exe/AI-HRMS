@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  HR_ADMIN
+  HR_STAFF
+  MANAGER
+  EMPLOYEE
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  INACTIVE
+  TERMINATED
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+}
+
+enum AttendanceStatus {
+  OPEN
+  COMPLETE
+  CORRECTION_REQUESTED
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Organization {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
+  slug         String       @unique
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  users        User[]
+  departments  Department[]
+  employees    Employee[]
+  sessions     Session[]
+  auditLogs    AuditLog[]
+  attendance   AttendanceRecord[]
+  leaveTypes   LeaveType[]
+  leaveBalances LeaveBalance[]
+  leaveRequests LeaveRequest[]
+}
+
+model User {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  email          String
+  passwordHash   String
+  role           UserRole
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee?
+  sessions       Session[]
+  auditLogs      AuditLog[]   @relation("AuditActor")
+  leaveApprovals LeaveRequest[] @relation("LeaveApprover")
+
+  @@unique([organizationId, email])
+  @@index([organizationId, role])
+}
+
+model Session {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @db.Uuid
+  organizationId String       @db.Uuid
+  tokenHash      String       @unique
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([organizationId, expiresAt])
+}
+
+model Department {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  name           String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees      Employee[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model Employee {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  userId         String?          @unique @db.Uuid
+  departmentId   String?          @db.Uuid
+  employeeNumber String
+  firstName      String
+  lastName       String
+  email          String
+  jobTitle       String?
+  status         EmploymentStatus @default(ACTIVE)
+  hiredAt        DateTime?
+  deactivatedAt  DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  department     Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  attendance     AttendanceRecord[]
+  leaveBalances  LeaveBalance[]
+  leaveRequests  LeaveRequest[]    @relation("LeaveEmployee")
+
+  @@unique([organizationId, employeeNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, lastName, firstName])
+}
+
+model AttendanceRecord {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  employeeId     String           @db.Uuid
+  clockInAt      DateTime
+  clockOutAt     DateTime?
+  status         AttendanceStatus @default(OPEN)
+  correctionNote String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, employeeId, clockInAt])
+  @@index([organizationId, status])
+}
+
+model LeaveType {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  name           String
+  daysPerYear    Int
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  balances       LeaveBalance[]
+  requests       LeaveRequest[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+}
+
+model LeaveBalance {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  employeeId     String       @db.Uuid
+  leaveTypeId    String       @db.Uuid
+  year           Int
+  allocatedDays  Int
+  usedDays       Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType      LeaveType    @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([organizationId, employeeId, year])
+}
+
+model LeaveRequest {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  employeeId     String            @db.Uuid
+  leaveTypeId    String            @db.Uuid
+  startDate      DateTime
+  endDate        DateTime
+  days           Int
+  reason         String?
+  status         LeaveRequestStatus @default(PENDING)
+  rejectionReason String?
+  approverId     String?           @db.Uuid
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee          @relation("LeaveEmployee", fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType      LeaveType         @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  approver       User?             @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, employeeId, status])
+  @@index([organizationId, startDate, endDate])
+}
+
+model AuditLog {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @db.Uuid
+  actorUserId    String?      @db.Uuid
+  action         String
+  targetType     String
+  targetId       String?
+  outcome        AuditOutcome
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor          User?        @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, targetType, targetId])
+}
