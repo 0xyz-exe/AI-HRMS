@@ -3,6 +3,25 @@
 AI-powered Human Resources Management System focused on secure,
 organization-scoped HR operations.
 
+Repository: https://github.com/0xyz-exe/AI-HRMS
+
+## Screenshots
+
+### HR Analytics & Employee Directory
+![Employee directory](docs/screenshots/01_employee_directory.png)
+
+### Attendance & Time Tracking
+![Attendance](docs/screenshots/02_attendance.png)
+
+### Leave Request & Approval Workflow
+![Leave management](docs/screenshots/03_leave_management.png)
+
+### AI Candidate Evaluation & Insights
+![AI evaluations](docs/screenshots/04_ai_evaluations.png)
+
+### Organization Settings & Role-Based Access Control
+![Settings](docs/screenshots/05_settings.png)
+
 ## Project status
 
 The repository has completed its requirements, authentication, authorization,
